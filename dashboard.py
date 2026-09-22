@@ -146,8 +146,8 @@ def _run_live_search_job(query: str):
             "current_source": current_source,
         })
 
-    cfg = load_config_raw()
     try:
+        cfg = load_config_raw()
         results = run_live_search(query, cfg, on_progress=on_progress)
         _write_live_search_status({
             "state": "done",
@@ -188,8 +188,8 @@ def _run_manual_scrape_job():
             "current_source": current_source,
         })
 
-    cfg = load_config_raw()
     try:
+        cfg = load_config_raw()
         results, new_listings = run_manual_scrape(cfg, on_progress=on_progress)
         _write_manual_scrape_status({
             "state": "done",
