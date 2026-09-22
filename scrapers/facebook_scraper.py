@@ -487,14 +487,17 @@ def scrape_facebook_marketplace_region(source: dict, keywords: list[str]) -> Scr
                     price = None
                     if aria_label:
                         label = re.sub(r',\s*listing\s+\d+\s*$', '', aria_label, flags=re.IGNORECASE)
-                        parts = [p.strip() for p in label.split(',')]
-                        price_idx = next(
-                            (i for i, p in enumerate(parts) if re.match(r'^\$[\d,]', p) or p.lower() == "free"),
-                            None,
-                        )
-                        if price_idx is not None and price_idx > 0:
-                            title = ", ".join(parts[:price_idx])
-                            price = None if parts[price_idx].lower() == "free" else parts[price_idx]
+                        # Search the raw label directly for the price token
+                        # rather than splitting on commas — a price itself
+                        # can contain a comma as a thousands separator (e.g.
+                        # "$1,200"), which a naive comma-split breaks into
+                        # "$1" and "200", silently truncating any price at
+                        # or above $1,000 down to its leading digit.
+                        price_match = re.search(r'\$[\d,]+(?:\.\d{2})?|(?<![A-Za-z])[Ff]ree(?![A-Za-z])', label)
+                        if price_match:
+                            title = label[:price_match.start()].strip().rstrip(',').strip()
+                            matched = price_match.group(0)
+                            price = None if matched.lower() == "free" else matched
 
                     text_content = card.inner_text()
                     match_text = aria_label or text_content
