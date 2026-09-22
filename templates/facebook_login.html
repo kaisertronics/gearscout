@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Gear Scout — Facebook Login{% endblock %}
+{% block content %}
+
+  <section class="panel">
+    <h2>Facebook Login</h2>
+    <p class="muted">
+      Log in to Facebook in the window below — email, password, 2FA, any
+      "I'm not a robot" check — all done by you, nothing automated. This
+      finishes on its own the moment you're logged in — no button to click.
+    </p>
+
+    <div id="fb-status" class="fb-status-banner">Starting...</div>
+
+    <div id="vnc-wrap" style="display:none;">
+      <iframe id="vnc-frame" title="Facebook login" class="vnc-frame"></iframe>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+      <form method="post" action="{{ url_for('facebook_login_cancel') }}">
+        <button type="submit" class="btn btn-danger">Cancel</button>
+      </form>
+      <button id="done-btn" class="btn btn-sm" style="display:none;background:var(--bg);color:var(--muted);">
+        Already logged in? Check now
+      </button>
+    </div>
+  </section>
+
+  <script>
+    const statusEl = document.getElementById('fb-status');
+    const vncWrap = document.getElementById('vnc-wrap');
+    const vncFrame = document.getElementById('vnc-frame');
+    const doneBtn = document.getElementById('done-btn');
+    let vncLoaded = false;
+    let redirecting = false;
+
+    function renderState(data) {
+      const state = data.state;
+      if (state === 'starting') {
+        statusEl.textContent = 'Starting a virtual browser session...';
+      } else if (state === 'waiting_for_login') {
+        statusEl.textContent = "Log in below — this'll pick it up automatically once you're in.";
+        doneBtn.style.display = '';
+        doneBtn.disabled = false;
+        if (!vncLoaded) {
+          // Relative to this same page's own host/port (and ws vs wss
+          // matches whatever this page loaded over) — works identically on
+          // localhost and through a single-port tunnel like ngrok, unlike
+          // a hardcoded separate port which a tunnel can't reach at all.
+          vncFrame.src = '/vnc/vnc.html?autoconnect=true&resize=scale&path=vnc-ws';
+          vncWrap.style.display = '';
+          vncLoaded = true;
+        }
+      } else if (state === 'verifying') {
+        statusEl.textContent = 'Checking your login...';
+        doneBtn.disabled = true;
+      } else if (state === 'success') {
+        statusEl.textContent = '✅ Logged in! Session saved. Taking you back to Sources...';
+        vncWrap.style.display = 'none';
+        doneBtn.style.display = 'none';
+        if (!redirecting) {
+          redirecting = true;
+          setTimeout(() => { window.location.href = "{{ url_for('sources') }}"; }, 2000);
+        }
+      } else if (state === 'failed') {
+        statusEl.textContent = '❌ ' + (data.reason || 'Login failed.');
+        doneBtn.disabled = false;
+      } else if (state === 'timed_out') {
+        statusEl.textContent = '⏱ Timed out waiting for login. Click Cancel and try again.';
+      } else {
+        statusEl.textContent = 'Idle — click "Log in to Facebook" from the Sources page to start.';
+      }
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch("{{ url_for('facebook_login_status') }}");
+        renderState(await resp.json());
+      } catch (e) { /* transient — next poll will retry */ }
+    }
+
+    doneBtn.addEventListener('click', async () => {
+      doneBtn.disabled = true;
+      statusEl.textContent = 'Checking your login...';
+      await fetch("{{ url_for('facebook_login_done') }}", { method: 'POST' });
+    });
+
+    poll();
+    setInterval(poll, 2000);
+  </script>
+
+{% endblock %}

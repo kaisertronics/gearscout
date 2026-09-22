@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Gear Scout — Settings{% endblock %}
+{% block content %}
+
+  <section class="panel">
+    <div class="settings-tabs">
+      <button type="button" class="settings-tab active" data-tab="email">Email & Schedule</button>
+      <button type="button" class="settings-tab" data-tab="keywords">Search Terms</button>
+      <button type="button" class="settings-tab" data-tab="data">Data</button>
+    </div>
+
+    {% if saved == 'email' %}
+      <div class="settings-saved">✓ Email &amp; schedule settings saved.</div>
+    {% elif saved == 'keywords' %}
+      <div class="settings-saved">✓ Search terms saved — {{ keyword_count }} keyword{{ 's' if keyword_count != 1 else '' }}.</div>
+    {% elif saved and saved.startswith('cleanup:') %}
+      <div class="settings-saved">✓ Removed {{ saved.split(':')[1] }} listing(s) that didn't match any current keyword.</div>
+    {% elif saved and saved.startswith('reset:') %}
+      <div class="settings-saved">✓ Reset complete — removed all {{ saved.split(':')[1] }} stored listing(s).</div>
+    {% endif %}
+
+    <div class="settings-panel" id="tab-email">
+      <form method="post" action="{{ url_for('settings_email') }}" class="settings-form">
+        <h3>Email digest</h3>
+        <div class="form-row">
+          <label>From address
+            <input type="email" name="from" value="{{ email_cfg.get('from', '') }}" placeholder="youraddress@gmail.com">
+          </label>
+          <label>To address
+            <input type="email" name="to" value="{{ email_cfg.get('to', '') }}" placeholder="youraddress@gmail.com">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>SMTP host
+            <input type="text" name="smtp_host" value="{{ email_cfg.get('smtp_host', '') }}" placeholder="smtp.gmail.com">
+          </label>
+          <label>SMTP port
+            <input type="number" name="smtp_port" value="{{ email_cfg.get('smtp_port', 587) }}">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="grow">App password
+            <input type="password" name="password" placeholder="Leave blank to keep the current one" autocomplete="new-password">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="grow">Subject line
+            <input type="text" name="subject" value="{{ email_cfg.get('subject', '') }}" placeholder="Gear Scout Digest">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Max listings shown per source
+            <input type="number" name="max_listings_per_source" min="1" value="{{ email_cfg.get('max_listings_per_source', 8) }}">
+          </label>
+          <label>Max total listings per email
+            <input type="number" name="max_total_listings" min="1" value="{{ email_cfg.get('max_total_listings', 40) }}">
+          </label>
+        </div>
+        <p class="muted">
+          The email is capped so it doesn't grow large enough that some email clients (Gmail
+          included) truncate it — anything past the cap is still visible on the Dashboard, just
+          not spelled out in the email itself. Raising these a lot will make for a bigger email;
+          keep an eye out if it starts looking cut off in your inbox.
+        </p>
+
+        <h3>Schedule</h3>
+        <div class="form-row">
+          <label>Timezone
+            <input type="text" name="timezone" value="{{ schedule_cfg.get('timezone', '') }}" placeholder="America/Los_Angeles">
+          </label>
+          <label class="grow">Cron expression
+            <input type="text" name="cron" value="{{ schedule_cfg.get('cron', '') }}" placeholder="0 7,12,17,21 * * *">
+          </label>
+        </div>
+        <p class="muted">
+          Cron format is <code>minute hour day month weekday</code>. The hour field takes a
+          comma-separated list, so <code>0 7,12,17,21 * * *</code> runs at 7am, noon, 5pm, and
+          9pm (in the timezone above) — leave minute at <code>0</code>, day/month/weekday at
+          <code>*</code>, unless you actually need something more specific. Find your timezone
+          name at
+          <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank" rel="noopener">this list</a>.
+        </p>
+        <p class="settings-warning">
+          <strong>Timezone/cron changes need a restart</strong> — the scheduler reads these once
+          when the <code>scout</code> container starts, not on every run, so a change here won't
+          take effect until you run <code>docker compose restart scout</code>. Everything else on
+          this tab doesn't need that — it's re-read fresh on every run.
+        </p>
+
+        <button type="submit" class="btn btn-primary">Save email &amp; schedule</button>
+      </form>
+    </div>
+
+    <div class="settings-panel" id="tab-keywords" style="display:none;">
+      <form method="post" action="{{ url_for('settings_keywords') }}" class="settings-form">
+        <h3>Search terms <span class="muted">— {{ keyword_count }} keyword{{ 's' if keyword_count != 1 else '' }}</span></h3>
+        <p class="muted">
+          One per line. Matching is whole-word and case-insensitive (plurals like "amps" also
+          match "amp"). This is the exact list every source filters against — Search, Live
+          Search, and the scheduled scrape all use it.
+        </p>
+        <p class="settings-warning">
+          <strong>Note:</strong> saving here replaces the whole keyword list in
+          <code>config.yaml</code> — any category comments you had in there (e.g. "# Microphones")
+          will be lost. Edit <code>config.yaml</code> directly instead if you want to keep those.
+        </p>
+        <textarea name="keywords" class="settings-keywords-textarea" rows="20" spellcheck="false">{{ keywords_text }}</textarea>
+        <button type="submit" class="btn btn-primary">Save search terms</button>
+      </form>
+    </div>
+
+    <div class="settings-panel" id="tab-data" style="display:none;">
+      <h3>Database</h3>
+      <div class="stat-row" style="margin-bottom:20px;">
+        <div class="stat-card">
+          <div class="stat-label">Total listings stored</div>
+          <div class="stat-value">{{ db_stats.total_seen }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Seen today</div>
+          <div class="stat-value">{{ db_stats.seen_today }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Not matching any current keyword</div>
+          <div class="stat-value">{{ mismatched_count }}</div>
+        </div>
+      </div>
+
+      <h3>Clean up irrelevant listings</h3>
+      <p class="muted">
+        Deletes any stored listing that doesn't match any of your <em>current</em> keywords —
+        useful after changing your search terms, or after using Live Search with a one-off term
+        that isn't part of your standing list. This never affects your favorites' underlying
+        listings unless they themselves no longer match any keyword.
+      </p>
+      <form method="post" action="{{ url_for('settings_cleanup') }}"
+            onsubmit="return confirm('Delete {{ mismatched_count }} listing(s) that don\'t match any current keyword?');">
+        <button type="submit" class="btn btn-danger" {{ 'disabled' if mismatched_count == 0 else '' }}>
+          Delete {{ mismatched_count }} mismatched listing{{ 's' if mismatched_count != 1 else '' }}
+        </button>
+      </form>
+
+      <h3>Reset everything</h3>
+      <p class="muted">
+        Deletes <strong>all</strong> stored listings, favorites, and tags — every source will
+        look "new" again on the next scrape. Doesn't touch <code>config.yaml</code> (your
+        sources/keywords/email settings are untouched) or your saved Facebook session.
+      </p>
+      <form method="post" action="{{ url_for('settings_reset_data') }}"
+            onsubmit="return confirm('This deletes ALL {{ db_stats.total_seen }} stored listings, favorites, and tags. This cannot be undone. Continue?');">
+        <button type="submit" class="btn btn-danger">Delete all {{ db_stats.total_seen }} stored listings</button>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const tabs = document.querySelectorAll('.settings-tab');
+    const panels = {
+      email: document.getElementById('tab-email'),
+      keywords: document.getElementById('tab-keywords'),
+      data: document.getElementById('tab-data'),
+    };
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        Object.entries(panels).forEach(([key, el]) => {
+          el.style.display = key === tab.dataset.tab ? '' : 'none';
+        });
+      });
+    });
+  </script>
+
+{% endblock %}

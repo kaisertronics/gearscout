@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gear Scout — Sign in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand" style="color:var(--navy);margin-bottom:20px;">🎛 Gear Scout</div>
+      {% if error %}<p class="login-error">{{ error }}</p>{% endif %}
+      <form method="post">
+        <label>Email
+          <input type="email" name="email" autofocus required autocomplete="username">
+        </label>
+        <label style="margin-top:12px;">Password
+          <input type="password" name="password" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn btn-primary" style="margin-top:14px;">Sign in</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

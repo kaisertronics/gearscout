@@ -1,0 +1,1 @@
+# Gear Scout scrapers package

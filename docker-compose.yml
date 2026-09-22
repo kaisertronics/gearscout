@@ -1,0 +1,73 @@
+services:
+  scout:
+    build: .
+    container_name: gear-scout
+    restart: unless-stopped
+    volumes:
+      - gear_scout_data:/data
+      # Mounting the whole directory (not just config.yaml) so the mount
+      # survives editors that save via atomic rename — a single-file bind
+      # mount goes stale (FileNotFoundError inside the container) the moment
+      # the host file's inode is replaced instead of edited in place.
+      - .:/config:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    # No ports needed for normal operation.
+    # Facebook login runs through the dashboard's own port — see USER_GUIDE.md.
+
+  dashboard:
+    build: .
+    container_name: gear-scout-dashboard
+    restart: unless-stopped
+    entrypoint: ["python3", "dashboard.py"]
+    volumes:
+      - gear_scout_data:/data
+      # Read-write (unlike the scout service above) — this is the one place
+      # allowed to edit config.yaml, since the source manager saves changes
+      # back to it.
+      - .:/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      # Everything — the dashboard UI, the source manager, and the
+      # in-browser Facebook login viewer — is served through this one port
+      # now (the noVNC viewer used to need its own port, 6080, but that
+      # meant it only worked when accessed as localhost:6080 directly; it's
+      # unreachable through a single-port tunnel like ngrok, which is why it
+      # showed a blank iframe over the public URL). Bound to localhost only.
+      - "127.0.0.1:8420:8420"
+
+  # Exposes the dashboard to the internet via ngrok, so you can check status
+  # or manage sources from any PC — see the "Remote access" section in
+  # USER_GUIDE.md for how to get an authtoken and find your public URL.
+  # Optional: comment this whole block out (or run
+  # `docker compose up -d scout dashboard` instead of a bare `up -d`) if you
+  # only want local access.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: gear-scout-ngrok
+    restart: unless-stopped
+    environment:
+      # Set in a .env file next to this docker-compose.yml (never commit it) —
+      # see INSTALL.md. If it's unset, this one container just fails/restarts
+      # on its own; scout and dashboard are unaffected either way. Skip
+      # starting this service entirely with `docker compose up -d scout
+      # dashboard` if you don't want ngrok.
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    command:
+      - "http"
+      - "dashboard:8420"
+    ports:
+      # ngrok's own local inspector — shows your current public URL and
+      # request log at http://localhost:4041 (this one stays localhost-only;
+      # it's not the tunnel itself). Mapped to host port 4041 (not ngrok's
+      # usual 4040) in case something else on your machine is already using
+      # 4040 — change the "4041" on the left if you'd rather use a different
+      # port; the container's own internal port always stays 4040.
+      - "127.0.0.1:4041:4040"
+    depends_on:
+      - dashboard
+
+volumes:
+  gear_scout_data:
+    driver: local

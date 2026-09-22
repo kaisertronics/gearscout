@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_listing_card.html" import listing_card %}
+{% block title %}Gear Scout — Favorites{% endblock %}
+{% block content %}
+
+  <section class="panel">
+    <h2>Favorites <span class="muted">— {{ result_count }} saved</span></h2>
+    {% if not grouped_listings %}
+      <p class="muted">No favorites yet — click the star on any listing to save it here.</p>
+    {% endif %}
+  </section>
+
+  {% for source_name, items in grouped_listings %}
+  <section class="panel">
+    <h2>{{ source_name }} <span class="muted">— {{ items|length }}</span></h2>
+    <div class="listing-grid">
+      {% for l in items %}
+        {{ listing_card(l) }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+{% endblock %}

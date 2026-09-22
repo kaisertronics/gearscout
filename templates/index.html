@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% from "_listing_card.html" import listing_card %}
+{% block title %}Gear Scout — Dashboard{% endblock %}
+{% block content %}
+
+  <div class="scrape-now-row">
+    <form method="post" action="{{ url_for('scrape_start') }}" id="scrape-now-form">
+      <button type="submit" id="scrape-now-btn" class="btn btn-primary">🔄 Scrape now</button>
+    </form>
+    <span class="muted">Runs a full scrape across every enabled source right now — updates everything below, but never sends an email.</span>
+  </div>
+  <div id="scrape-status-banner" class="live-status-banner" style="display:none;"></div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Last run</div>
+      <div class="stat-value">
+        {% if status %}
+          {{ status.run_time[:16].replace('T', ' ') }} UTC
+        {% else %}
+          never
+        {% endif %}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Next scheduled run</div>
+      <div class="stat-value">{{ next_run or '—' }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sources OK</div>
+      <div class="stat-value">
+        {% if status %}{{ status.ok_sources }}/{{ status.total_sources }}{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total listings seen</div>
+      <div class="stat-value">{{ db_stats.total_seen }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Facebook session</div>
+      <div class="stat-value">
+        {% if fb_session.present %}
+          <span class="badge badge-ok">active</span> ({{ fb_session.age_days }}d old)
+        {% else %}
+          <span class="badge badge-fail">not logged in</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Facebook Marketplace — search all regions</h2>
+    <p class="muted">
+      Type one search term and open it across all {{ fbm_regions|length }} US regions at once,
+      each in its own browser tab — using your own logged-in Facebook session, not this app's.
+      Nothing is scraped or stored here; this just opens the same search Facebook's own site
+      would run, in every region, so you can browse the results yourself.
+    </p>
+
+    <div class="fbm-note">
+      <strong>One-time setup:</strong> open
+      <a href="https://www.facebook.com/marketplace" target="_blank" rel="noopener">Facebook Marketplace</a>
+      and set your search radius (under Filters) to however wide you want — Facebook remembers
+      that per-account, so every region search here will use it automatically.
+    </div>
+
+    <div class="fbm-note">
+      Browsers generally only allow one tab to open automatically per click, and won't always
+      show a visible warning when they block the rest — so clicking the button below opens
+      what it can, and a link for <strong>every</strong> region always appears underneath it too.
+      Click any of those directly to open that region — a normal link click always works,
+      regardless of your browser's pop-up settings.
+    </div>
+
+    <form id="fbm-form" class="search-form" onsubmit="return false;">
+      <input type="text" id="fbm-query" class="search-input" placeholder="e.g. neve 1073">
+      <button type="button" id="fbm-open-btn" class="btn btn-primary">Open all {{ fbm_regions|length }} regions</button>
+    </form>
+    <div id="fbm-manual-links" class="fbm-manual-links" style="display:none;"></div>
+  </section>
+
+  {% if status %}
+  <section class="panel">
+    <h2>Source status <span class="muted">— {{ 'manual scrape' if status.manual else 'run #' + status.run_number|string }}</span></h2>
+    <table class="status-table">
+      <thead>
+        <tr><th>Source</th><th>Result</th><th>Time</th><th>Error</th></tr>
+      </thead>
+      <tbody>
+        {% for s in status.sources %}
+        <tr>
+          <td><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a></td>
+          <td>
+            {% if s.success %}
+              <span class="badge badge-ok">✓ {{ s.count }} new</span>
+            {% elif s.blocked %}
+              <span class="badge badge-blocked">🔗 manual check only</span>
+            {% else %}
+              <span class="badge badge-fail">✗ failed</span>
+            {% endif %}
+          </td>
+          <td class="muted">{{ s.duration_seconds }}s</td>
+          <td class="{{ 'blocked-cell' if s.blocked else 'error-cell' }}">
+            {% if not s.blocked %}{{ s.error or '' }}{% endif %}
+            {% if s.fix_hint %}
+              <div class="{{ 'blocked-hint' if s.blocked else 'fix-hint' }}">
+                {{ s.fix_hint }}
+                {% if s.url %}
+                  <div style="margin-top:8px;">
+                    <a href="{{ s.url }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+                      Open {{ s.name }} in browser &rarr;
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if not grouped_listings %}
+  <section class="panel">
+    <h2>Recent listings</h2>
+    <p class="muted">No listings seen yet — check back after the first run.</p>
+  </section>
+  {% endif %}
+
+  {% for source_name, items in grouped_listings %}
+  <section class="panel">
+    <h2>{{ source_name }} <span class="muted">— {{ items|length }} recent</span></h2>
+    <div class="listing-grid">
+      {% for l in items %}
+        {{ listing_card(l) }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <script>
+    const scrapeBanner = document.getElementById('scrape-status-banner');
+    const scrapeBtn = document.getElementById('scrape-now-btn');
+
+    // The status file stays at "done" (or "failed") indefinitely after a
+    // scrape finishes — it's not reset until the next one starts. Reloading
+    // the page whenever we see "done" would otherwise reload forever: the
+    // reload itself lands on a fresh page load that immediately polls,
+    // sees the same never-cleared "done", and reloads again. Only react to
+    // a terminal state if THIS page load actually watched it go from
+    // running -> done/failed — a stale "done" from some earlier scrape
+    // just means nothing to do, the page already reflects it.
+    let sawRunning = false;
+
+    function renderScrapeStatus(data) {
+      if (data.state === 'running') {
+        sawRunning = true;
+        scrapeBanner.style.display = '';
+        scrapeBtn.disabled = true;
+        if (data.total) {
+          scrapeBanner.textContent = `Scraping now (${data.done}/${data.total} sources)` +
+            (data.current_source ? ` — checking ${data.current_source}...` : '');
+        } else {
+          scrapeBanner.textContent = 'Starting scrape...';
+        }
+        setTimeout(poll, 2000);
+      } else if (data.state === 'done' && sawRunning) {
+        scrapeBanner.style.display = '';
+        scrapeBanner.textContent = `Scrape done — ${data.new_count} new listing(s) found across ${data.sources_ok}/${data.sources_total} sources. Reloading...`;
+        setTimeout(() => { window.location.reload(); }, 1500);
+      } else if (data.state === 'failed' && sawRunning) {
+        scrapeBanner.style.display = '';
+        scrapeBtn.disabled = false;
+        scrapeBanner.textContent = '⚠️ Scrape failed: ' + (data.reason || 'unknown error');
+      } else {
+        scrapeBanner.style.display = 'none';
+        scrapeBtn.disabled = false;
+      }
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch("{{ url_for('scrape_status') }}");
+        renderScrapeStatus(await resp.json());
+      } catch (e) { /* transient — next poll will retry */ }
+    }
+
+    poll();
+
+    const FBM_REGIONS = {{ fbm_regions|tojson }};
+    const fbmQueryInput = document.getElementById('fbm-query');
+    const fbmOpenBtn = document.getElementById('fbm-open-btn');
+    const fbmManualLinks = document.getElementById('fbm-manual-links');
+
+    function fbmRegionSearchUrl(locationId, query) {
+      return `https://www.facebook.com/marketplace/${locationId}/search?query=${encodeURIComponent(query)}&sortBy=best_match`;
+    }
+
+    // Whether a window.open() call actually opened a tab is not reliably
+    // detectable from JS — browsers vary in whether a blocked call returns
+    // null, a handle that reports closed=true, or (in some cases observed
+    // in the wild) something that looks "open" even though nothing
+    // rendered, with no visible warning of any kind. Rather than guess,
+    // this always renders a real link per region below the button — a
+    // genuine click on an <a> is never subject to the one-pop-up-per-click
+    // limit the loop below runs into, so it's a guaranteed way to reach
+    // every region regardless of what the browser did with the bulk attempt.
+    fbmOpenBtn.addEventListener('click', () => {
+      const query = fbmQueryInput.value.trim();
+      if (!query) {
+        fbmQueryInput.focus();
+        return;
+      }
+
+      fbmManualLinks.innerHTML = FBM_REGIONS.map(region =>
+        `<a href="${fbmRegionSearchUrl(region.location_id, query)}" target="_blank" rel="noopener" class="fbm-manual-link">${region.name}</a>`
+      ).join('');
+      fbmManualLinks.style.display = '';
+
+      for (const region of FBM_REGIONS) {
+        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
+      }
+    });
+
+    fbmQueryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') fbmOpenBtn.click();
+    });
+  </script>
+
+{% endblock %}

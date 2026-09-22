@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "_listing_card.html" import listing_card %}
+{% block title %}Gear Scout — Search{% endblock %}
+{% block content %}
+
+  <section class="panel">
+    <h2>Search all sources</h2>
+    <form method="get" action="{{ url_for('search') }}" class="search-form">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search title, description, tags..." class="search-input" id="search-q-input" autofocus>
+      <button type="submit">Search</button>
+    </form>
+    <div class="live-search-row">
+      <form method="post" action="{{ url_for('search_live_start') }}" id="live-search-form">
+        <input type="hidden" name="q" value="{{ q }}">
+        <button type="submit" id="live-search-btn" class="btn-live-search" {{ 'disabled' if not q else '' }}>
+          🔴 Search live now
+        </button>
+      </form>
+      <span class="muted">Re-checks every site right now instead of just what's already been collected — takes a minute or two.</span>
+    </div>
+    <div id="live-status-banner" class="live-status-banner" style="display:none;"></div>
+    {% if q %}
+      <p class="muted">{{ result_count }} result{{ 's' if result_count != 1 else '' }} for "{{ q }}" (from listings already collected — click "Search live now" above to check every site fresh)</p>
+    {% endif %}
+  </section>
+
+  {% if q and not grouped_listings %}
+  <section class="panel">
+    <p class="muted">No listings match "{{ q }}" yet — try "Search live now" above to check every site fresh.</p>
+  </section>
+  {% endif %}
+
+  {% for source_name, items in grouped_listings %}
+  <section class="panel">
+    <h2>{{ source_name }} <span class="muted">— {{ items|length }} match{{ 'es' if items|length != 1 else '' }}</span></h2>
+    <div class="listing-grid">
+      {% for l in items %}
+        {{ listing_card(l) }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <script>
+    const banner = document.getElementById('live-status-banner');
+    const liveBtn = document.getElementById('live-search-btn');
+    const qInput = document.getElementById('search-q-input');
+    const currentQ = {{ q|tojson }};
+
+    // Same reasoning as the manual-scrape banner on the Dashboard page: the
+    // status file keeps saying "done" for this query indefinitely, so
+    // reloading whenever we see it (even matched to currentQ, which is
+    // stable across a reload to the same URL) would reload forever. Only
+    // react to a terminal state if THIS page load actually watched it
+    // transition from running.
+    let sawRunning = false;
+
+    function renderLiveStatus(data) {
+      if (data.state === 'running' && data.query === currentQ) {
+        sawRunning = true;
+        banner.style.display = '';
+        liveBtn.disabled = true;
+        if (data.total) {
+          banner.textContent = `Searching live (${data.done}/${data.total} sources)` +
+            (data.current_source ? ` — checking ${data.current_source}...` : '');
+        } else {
+          banner.textContent = 'Starting live search...';
+        }
+        setTimeout(poll, 2000);
+      } else if (data.state === 'done' && data.query === currentQ && sawRunning) {
+        banner.style.display = '';
+        banner.textContent = `Live search done — ${data.matched_count} match(es) found across ${data.sources_ok}/${data.sources_total} sources. Reloading...`;
+        setTimeout(() => { window.location.href = "{{ url_for('search') }}?q=" + encodeURIComponent(currentQ); }, 1500);
+      } else if (data.state === 'failed' && data.query === currentQ && sawRunning) {
+        banner.style.display = '';
+        liveBtn.disabled = !qInput.value.trim();
+        banner.textContent = '⚠️ Live search failed: ' + (data.reason || 'unknown error');
+      } else {
+        banner.style.display = 'none';
+        liveBtn.disabled = !qInput.value.trim();
+      }
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch("{{ url_for('search_live_status') }}");
+        renderLiveStatus(await resp.json());
+      } catch (e) { /* transient — next poll will retry */ }
+    }
+
+    qInput.addEventListener('input', () => {
+      document.getElementById('live-search-form').querySelector('input[name=q]').value = qInput.value;
+    });
+
+    poll();
+  </script>
+
+{% endblock %}

@@ -1,0 +1,10 @@
+feedparser==6.0.11
+requests==2.31.0
+beautifulsoup4==4.12.3
+lxml==5.1.0
+pyyaml==6.0.1
+apscheduler==3.10.4
+playwright==1.44.0
+flask==3.0.3
+flask-sock==0.7.0
+ruamel.yaml==0.18.6

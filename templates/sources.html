@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Gear Scout — Sources{% endblock %}
+{% block content %}
+
+  <section class="panel">
+    <h2>Add a source</h2>
+    <form method="post" action="{{ url_for('add_source') }}" class="add-form">
+      <div class="form-row">
+        <label>Name
+          <input type="text" name="name" placeholder="FB — My Local Group" required>
+        </label>
+        <label>Type
+          <select name="type" id="type-select">
+            {% for t in source_types %}
+              <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="grow">URL
+          <input type="url" name="url" placeholder="https://www.facebook.com/groups/..." required>
+        </label>
+      </div>
+      <div class="form-row" id="rss-row" style="display:none;">
+        <label class="grow">RSS feed URL <span class="muted">(only for rss/ebay_rss sources)</span>
+          <input type="url" name="rss_url" placeholder="https://.../index.rss">
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary">Add source</button>
+    </form>
+    <p class="muted" style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+      Facebook groups need an active session first.
+      {% if fb_session.present %}
+        <span class="badge badge-ok">session active ({{ fb_session.age_days }}d old)</span>
+      {% else %}
+        <span class="badge badge-fail">no session yet</span>
+      {% endif %}
+      <form method="post" action="{{ url_for('facebook_login_start') }}" style="display:inline;">
+        <button type="submit" class="btn btn-primary btn-sm">Log in to Facebook</button>
+      </form>
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Current sources <span class="muted">— {{ sources|length }}</span></h2>
+    <table class="status-table">
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>URL</th><th>Enabled</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for s in sources %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td><span class="badge badge-type">{{ s.type }}</span></td>
+          <td class="url-cell"><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a></td>
+          <td>
+            <form method="post" action="{{ url_for('toggle_source') }}" style="display:inline;">
+              <input type="hidden" name="name" value="{{ s.name }}">
+              <button type="submit" class="badge-btn {{ 'badge-ok' if s.enabled|default(true) else 'badge-fail' }}">
+                {{ 'enabled' if s.enabled|default(true) else 'disabled' }}
+              </button>
+            </form>
+          </td>
+          <td class="source-actions">
+            <button type="button" class="btn btn-sm source-test-btn" data-name="{{ s.name }}" data-row="{{ loop.index }}">Test</button>
+            <button type="button" class="btn btn-sm source-edit-toggle" data-row="{{ loop.index }}">Edit</button>
+            <form method="post" action="{{ url_for('delete_source') }}"
+                  onsubmit="return confirm('Remove {{ s.name }}?');" style="display:inline;">
+              <input type="hidden" name="name" value="{{ s.name }}">
+              <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+            </form>
+          </td>
+        </tr>
+        <tr class="source-test-result" id="test-result-{{ loop.index }}" style="display:none;">
+          <td colspan="5"></td>
+        </tr>
+        <tr class="source-edit-row" id="edit-row-{{ loop.index }}" style="display:none;">
+          <td colspan="5">
+            <form method="post" action="{{ url_for('edit_source') }}" class="add-form">
+              <input type="hidden" name="original_name" value="{{ s.name }}">
+              <div class="form-row">
+                <label>Name
+                  <input type="text" name="name" value="{{ s.name }}" required>
+                </label>
+                <label>Type
+                  <select name="type" class="source-edit-type" data-row="{{ loop.index }}">
+                    {% for t in source_types %}
+                      <option value="{{ t }}" {{ 'selected' if t == s.type else '' }}>{{ t }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="grow">URL
+                  <input type="url" name="url" value="{{ s.url }}" required>
+                </label>
+              </div>
+              <div class="form-row source-edit-rss-row" id="edit-rss-row-{{ loop.index }}"
+                   style="{{ '' if s.type in ('rss', 'ebay_rss') else 'display:none;' }}">
+                <label class="grow">RSS feed URL <span class="muted">(only for rss/ebay_rss sources)</span>
+                  <input type="url" name="rss_url" value="{{ s.rss_url|default('') }}">
+                </label>
+              </div>
+              <div class="form-row">
+                <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                <button type="button" class="btn btn-sm source-edit-cancel" data-row="{{ loop.index }}">Cancel</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const typeSelect = document.getElementById('type-select');
+    const rssRow = document.getElementById('rss-row');
+    function syncRssRow() {
+      rssRow.style.display = (typeSelect.value === 'rss' || typeSelect.value === 'ebay_rss') ? '' : 'none';
+    }
+    typeSelect.addEventListener('change', syncRssRow);
+    syncRssRow();
+
+    // Edit toggle — only one edit row open at a time.
+    document.querySelectorAll('.source-edit-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = document.getElementById('edit-row-' + btn.dataset.row);
+        const isOpen = row.style.display !== 'none';
+        document.querySelectorAll('.source-edit-row').forEach(r => r.style.display = 'none');
+        row.style.display = isOpen ? 'none' : '';
+      });
+    });
+    document.querySelectorAll('.source-edit-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('edit-row-' + btn.dataset.row).style.display = 'none';
+      });
+    });
+    document.querySelectorAll('.source-edit-type').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const rssRow = document.getElementById('edit-rss-row-' + sel.dataset.row);
+        rssRow.style.display = (sel.value === 'rss' || sel.value === 'ebay_rss') ? '' : 'none';
+      });
+    });
+
+    // Test — runs that one source right now and shows the result inline.
+    document.querySelectorAll('.source-test-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const resultRow = document.getElementById('test-result-' + btn.dataset.row);
+        const cell = resultRow.querySelector('td');
+        resultRow.style.display = '';
+        cell.innerHTML = '<span class="muted">Testing ' + btn.dataset.name + '... this can take up to 30-60s for some sources.</span>';
+        btn.disabled = true;
+        try {
+          const resp = await fetch("{{ url_for('test_source') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'name=' + encodeURIComponent(btn.dataset.name),
+          });
+          const data = await resp.json();
+          let cls = 'blocked-hint';
+          let label = `✓ Success — ${data.count} listing(s) found in ${data.duration}s`;
+          if (data.blocked) {
+            label = `🔗 Manual check only — ${data.error || ''}`;
+          } else if (!data.success) {
+            cls = 'fix-hint';
+            label = `✗ Failed — ${data.error || 'unknown error'}`;
+          }
+          cell.innerHTML = `<div class="${cls}" style="margin:0;">${label}${data.fix_hint ? '<br><span class="muted">' + data.fix_hint + '</span>' : ''}</div>`;
+        } catch (e) {
+          cell.innerHTML = '<span class="error-cell">Test request failed — check the dashboard container is running.</span>';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+
+{% endblock %}

@@ -1,0 +1,246 @@
+# ============================================================
+# GEAR SCOUT — Configuration
+# ============================================================
+# Copy this file to config.yaml (same folder as docker-compose.yml) and fill
+# in the sections below. config.yaml holds your real credentials and your
+# own search terms — never commit it or share it; config.yaml.example (this
+# file) is the template that's safe to share.
+#
+#   cp config.yaml.example config.yaml
+#
+# See INSTALL.md for the full setup walkthrough and USER_GUIDE.md for how to
+# use everything once it's running.
+
+# --- Reddit OAuth (optional) ------------------------------------
+# Only needed if you add a "reddit" type source below. Free to set up:
+# 1. Go to https://www.reddit.com/prefs/apps
+# 2. Click "Create App" → choose "script"
+# 3. Name it anything, redirect URI: http://localhost:8080
+# 4. Copy the client_id (under the app name) and client_secret
+reddit_oauth:
+  client_id: ""
+  client_secret: ""
+  username: ""      # your Reddit username
+  password: ""      # your Reddit password
+
+# --- Facebook Credentials ------------------------------------
+# Only needed if you add "facebook" type sources (Facebook groups/marketplace
+# searches) below. Used only for the in-dashboard Facebook login — stored
+# locally in config.yaml, never sent anywhere else. Leave blank if you're not
+# using Facebook sources.
+facebook:
+  email: ""
+  password: ""
+
+# --- Email ---------------------------------------------------
+# The digest email, sent on the schedule below. Gmail is the easiest option;
+# any SMTP provider works if you change smtp_host/smtp_port.
+#
+# NOTE: "from" + "password" below also log you into the dashboard — there's
+# no separate dashboard password. If you'd rather not gate the dashboard at
+# all (e.g. it's only reachable on your home network), see the "Dashboard
+# login" section of USER_GUIDE.md for how to turn that off.
+email:
+  from: ""
+  to: ""
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  # Use a Gmail App Password (NOT your regular password).
+  # Get one at: https://myaccount.google.com/apppasswords
+  # Requires 2FA to be enabled on your Google account first.
+  password: ""
+  subject: "Gear Scout Digest"
+
+# --- Schedule ------------------------------------------------
+schedule:
+  # IANA timezone name — cron times below are interpreted in this zone, and
+  # DST transitions are handled automatically (no manual offset updates).
+  # Find yours at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  timezone: "UTC"
+  # Cron expression: "minute hour day month day_of_week". This default runs
+  # once a day at 8am in the timezone above — change it to whatever cadence
+  # you want (e.g. "0 7,12,17,21 * * *" for 4x/day).
+  cron: "0 8 * * *"
+
+# --- Keywords ------------------------------------------------
+# This is the whole point of the app: it only ever surfaces a listing if its
+# title/description matches one of YOUR keywords below. This list ships
+# EMPTY on purpose — Gear Scout doesn't assume what instrument or gear
+# you're after, so add your own before your first run, or you'll get emails
+# with a source status report but no listings.
+#
+# Matching is whole-word (case-insensitive, plurals like "guitars" also
+# match "guitar"), so short keywords like "eq" or "amp" won't misfire on
+# unrelated words.
+#
+# Copy any of these examples down into the "keywords:" list below, each as
+# its own "  - line" (e.g. "  - stratocaster"). The list starts as "[]" —
+# leave it that way only if you like getting emails with a status report
+# and zero listings; otherwise replace "[]" with your own "  - "-style
+# entries the same way the other lists in this file (like sources: below)
+# are written.
+#
+#   Guitars & Bass:      stratocaster, telecaster, les paul, jazzmaster,
+#                        jazz bass, precision bass, acoustic guitar, 12-string
+#   Drums & Percussion:  drum kit, snare drum, cymbal, hi-hat, djembe, cajon
+#   Keyboards & Synths:  synthesizer, moog, juno, digital piano,
+#                        midi controller, rhodes
+#   DJ Gear:             turntable, dj controller, cdj
+#   Studio / Pro Audio:  microphone, preamp, compressor, audio interface,
+#                        studio monitor, mixing console
+#   Brass & Woodwinds:   trumpet, saxophone, clarinet, trombone
+#   Orchestral Strings:  violin, cello, upright bass
+#   Amps & Effects:      guitar amp, tube amp, fuzz pedal, overdrive pedal,
+#                        pedalboard
+keywords: []
+
+# --- Sources -------------------------------------------------
+# Each source has a name, url, type, and enabled flag.
+#   type: html        — scraped as a web page (most sites)
+#   type: rss         — scraped from an RSS/Atom feed (forums mostly)
+#   type: craigslist  — Craigslist's own search format, one specific city
+#   type: craigslist_region — a broad ~1000-mile-radius Craigslist search
+#                        (see the 3 US West/Central/East sources below)
+#   type: facebook    — a Facebook group/marketplace search (needs login —
+#                        see USER_GUIDE.md)
+#   type: reddit      — a subreddit (needs reddit_oauth above)
+#
+# All the marketplace sources below are already general — they cover every
+# instrument category, not just one — because filtering happens locally
+# against YOUR keywords above, not by picking a site category. Remove any
+# source you don't want, and add your own the same way from the dashboard's
+# Sources page or by editing this list directly.
+
+sources:
+
+  # ---- General marketplaces (cover every instrument category) ----
+  - name: "Reverb — All Used"
+    url: "https://reverb.com/marketplace?condition=used&sort=published_at%7Cdesc"
+    type: html
+    enabled: true
+
+  - name: "eBay — Musical Instruments & Gear"
+    url: "https://www.ebay.com/b/Musical-Instruments-Gear/619/bn_1865601?LH_ItemCondition=3000&_sop=10"
+    type: html
+    enabled: true
+
+  # Guitar Center and Sweetwater both sit behind Akamai Bot Manager, which
+  # blocks headless scraping (confirmed via a reCAPTCHA challenge) — Gear
+  # Scout is upfront about this rather than trying to defeat it. These
+  # sources will show as "manual check only" with a one-click link to open
+  # the same search in your own browser, instead of pretending they work.
+  - name: "Guitar Center — Used"
+    url: "https://www.guitarcenter.com/Used.gc?Ns=cD"
+    type: html
+    enabled: true
+
+  - name: "Sweetwater — Gear Exchange"
+    url: "https://www.sweetwater.com/used/gear?sort=published_desc&radius=all"
+    type: html
+    enabled: true
+
+  # ---- Craigslist — 3 broad regions covering the whole continental US ----
+  # Each uses Craigslist's own "search distance" filter set to ~1000 miles
+  # from a central point (confirmed live: it genuinely returns results that
+  # far out, e.g. a Seattle-area URL with a Miami postal code returns
+  # Cincinnati/Tampa/Nashville/etc) — no need to list individual cities.
+  # Centers are picked so the three circles overlap and jointly cover the
+  # country. Each listing still shows/searches under its own actual posted
+  # city (e.g. "Craigslist — Sherman Oaks"), parsed per-listing, not a
+  # generic "West/Central/East" label. To add a specific city instead (or
+  # one outside the US), add a "craigslist" type source with its own
+  # {city}.craigslist.org/search/msa URL — find city subdomains at
+  # https://www.craigslist.org/about/sites.
+  - name: "Craigslist — US West"
+    url: "https://www.craigslist.org/search/area/seattle?cat=msa&postal=84101&search_distance=1000"
+    type: craigslist_region
+    enabled: true
+
+  - name: "Craigslist — US Central"
+    url: "https://www.craigslist.org/search/area/chicago?cat=msa&postal=67202&search_distance=1000"
+    type: craigslist_region
+    enabled: true
+
+  - name: "Craigslist — US East"
+    url: "https://www.craigslist.org/search/area/newyork?cat=msa&postal=40202&search_distance=1000"
+    type: craigslist_region
+    enabled: true
+
+  # ---- Pro-audio / recording-gear specific (remove if not your thing) ----
+  # These four are community forums and a hi-fi/pro-audio marketplace aimed
+  # specifically at studio and recording gear — great if that's your focus,
+  # not useful if you're after guitars/drums/DJ gear/etc. Remove them, or
+  # swap in a forum/marketplace for your own instrument the same way (a
+  # forum's own RSS feed works great as type: rss).
+  - name: "GroupDIY — White Market"
+    url: "https://groupdiy.com/forums/white-market.14/"
+    type: rss
+    rss_url: "https://groupdiy.com/forums/white-market.14/index.rss"
+    enabled: false
+
+  - name: "Gearspace — Classifieds"
+    url: "https://gearspace.com/classifieds/"
+    type: html
+    enabled: false
+
+  - name: "Audiogon — Used Listings"
+    url: "https://www.audiogon.com/listings"
+    type: html
+    enabled: false
+
+  - name: "US Audio Mart"
+    url: "https://www.usaudiomart.com/classifieds/all/"
+    type: html
+    enabled: false
+
+  # ---- Facebook groups (optional) ----
+  # Facebook sources need an active login first — start it from the
+  # dashboard's Sources page ("Log in to Facebook"), see USER_GUIDE.md.
+  # Add your own groups the same way: paste the group URL, type: facebook.
+  # - name: "FB — My Local Gear Group"
+  #   url: "https://www.facebook.com/groups/REPLACE_WITH_YOUR_GROUP_ID"
+  #   type: facebook
+  #   enabled: false
+
+  # ---- Facebook Marketplace — 8 regions covering the whole US (optional) ----
+  # Needs the same Facebook login as the groups above. Unlike a keyword
+  # search (Facebook's search box requires ALL words to match, same
+  # limitation as Craigslist/eBay), each region fetches its general browse
+  # feed once and filters locally against your whole keyword list — 8
+  # automated requests per run, not one per keyword. See USER_GUIDE.md for
+  # details, including the manual "search all regions at once" page at
+  # /facebook-marketplace, which needs no login setup here at all. Uncomment
+  # to enable (all 8, or just the ones covering where you actually want
+  # results from):
+  # - name: "FB Marketplace — Pacific Northwest"
+  #   url: "https://www.facebook.com/marketplace/113093802034968"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Southwest"
+  #   url: "https://www.facebook.com/marketplace/109546952404225"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Rocky Mountains"
+  #   url: "https://www.facebook.com/marketplace/106084172755635"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Texas"
+  #   url: "https://www.facebook.com/marketplace/105590109474550"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — The South"
+  #   url: "https://www.facebook.com/marketplace/105701396129318"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Midwest"
+  #   url: "https://www.facebook.com/marketplace/108018822553353"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Mid-Atlantic"
+  #   url: "https://www.facebook.com/marketplace/107524245944156"
+  #   type: facebook_marketplace_region
+  #   enabled: false
+  # - name: "FB Marketplace — Southeast"
+  #   url: "https://www.facebook.com/marketplace/113541638659587"
+  #   type: facebook_marketplace_region
+  #   enabled: false

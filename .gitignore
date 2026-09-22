@@ -1,0 +1,12 @@
+# Your real config and secrets — never commit these. Copy the .example
+# versions instead (see INSTALL.md).
+config.yaml
+.env
+
+# Local data (SQLite DB, Facebook session, run status) lives in a Docker
+# volume, not here, but just in case anything ever gets written locally:
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.DS_Store
