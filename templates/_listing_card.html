@@ -1,6 +1,6 @@
 {% macro listing_card(l) %}
 <div class="listing-card">
-  <a class="listing-card-link" href="{{ l.url }}" target="_blank" rel="noopener">
+  {% set card_body %}
     {% if l.image_url %}
       <img src="{{ l.image_url }}" alt="" class="listing-img" loading="lazy">
     {% else %}
@@ -17,7 +17,12 @@
       <div class="listing-title">{{ l.title }}</div>
       {% if l.price %}<div class="listing-price">{{ l.price }}</div>{% endif %}
     </div>
-  </a>
+  {% endset %}
+  {% if l.url %}
+    <a class="listing-card-link" href="{{ l.url }}" target="_blank" rel="noopener">{{ card_body }}</a>
+  {% else %}
+    <div class="listing-card-link listing-card-nolink" title="No link was saved for this listing">{{ card_body }}</div>
+  {% endif %}
 
   <form method="post" action="{{ url_for('listing_favorite') }}" class="listing-fav-form">
     <input type="hidden" name="global_id" value="{{ l.global_id }}">

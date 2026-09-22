@@ -6,7 +6,7 @@
   <title>{% block title %}Gear Scout{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body data-endpoint="{{ request.endpoint }}">
   <header class="topbar">
     <div class="topbar-inner">
       <a href="{{ url_for('index') }}" class="brand">🎛 Gear Scout</a>
@@ -28,5 +28,62 @@
   <main class="container">
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+    // Both the favorite star and the tag-save button were plain HTML forms —
+    // every click did a full POST + redirect back to the same page, which
+    // reloads the document from scratch and drops the scroll position back
+    // to the top. Intercepting the submit and doing the same POST via
+    // fetch() keeps the user right where they were.
+    document.addEventListener('submit', async (e) => {
+      const form = e.target;
+
+      if (form.classList.contains('listing-fav-form')) {
+        e.preventDefault();
+        const data = new FormData(form);
+        const willBeFavorite = data.get('favorite') === '1';
+        try {
+          const resp = await fetch(form.action, { method: 'POST', body: data });
+          if (!resp.ok) throw new Error('bad status');
+        } catch (err) {
+          form.submit();
+          return;
+        }
+        const card = form.closest('.listing-card');
+        const onFavoritesPage = document.body.dataset.endpoint === 'favorites';
+        if (!willBeFavorite && onFavoritesPage) {
+          card.remove();
+          return;
+        }
+        const star = form.querySelector('.fav-star');
+        star.classList.toggle('is-favorite', willBeFavorite);
+        star.title = willBeFavorite ? 'Remove from favorites' : 'Add to favorites';
+        form.querySelector('input[name="favorite"]').value = willBeFavorite ? '0' : '1';
+        return;
+      }
+
+      if (form.closest('.tag-edit')) {
+        e.preventDefault();
+        try {
+          const resp = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+          if (!resp.ok) throw new Error('bad status');
+        } catch (err) {
+          form.submit();
+          return;
+        }
+        const tagsInput = form.querySelector('input[name="tags"]');
+        const tagsContainer = form.closest('.listing-tags');
+        const details = tagsContainer.querySelector('details.tag-edit');
+        tagsContainer.querySelectorAll('.tag-chip').forEach((el) => el.remove());
+        tagsInput.value.split(',').map((t) => t.trim()).filter(Boolean).forEach((t) => {
+          const chip = document.createElement('span');
+          chip.className = 'tag-chip';
+          chip.textContent = t;
+          tagsContainer.insertBefore(chip, details);
+        });
+        details.removeAttribute('open');
+      }
+    });
+  </script>
 </body>
 </html>
