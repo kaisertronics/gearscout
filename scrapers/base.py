@@ -76,6 +76,18 @@ def keyword_match(text: str, keywords: list[str]) -> bool:
         pattern = _keyword_pattern(kw)
         if pattern and pattern.search(text_lower):
             return True
+
+    # A single term means a live search, where the site's own search already
+    # did the real matching and normalizes spacing/hyphens ("KM 184", "KM-184"
+    # and "KM184NI" all count as "km184" on Reverb). Compare with those
+    # stripped so we don't discard results the site correctly returned. Only
+    # for alphanumeric model-number-style terms (has a digit, 4+ chars) —
+    # short/plain words like "eq" or "mic" must keep strict word matching.
+    if len(keywords) == 1:
+        compact_kw = re.sub(r'[^a-z0-9]', '', keywords[0].lower())
+        if len(compact_kw) >= 4 and any(c.isdigit() for c in compact_kw):
+            if compact_kw in re.sub(r'[^a-z0-9]', '', text_lower):
+                return True
     return False
 
 

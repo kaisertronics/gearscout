@@ -624,6 +624,8 @@ def scrape_reverb(source: dict, keywords: list[str]) -> ScrapeResult:
             duration_seconds=time.time() - start,
         )
 
+    seen_listing_ids: set[str] = set()
+    seen_hrefs: set[str] = set()
     for card in cards:
         title_el = (card.select_one(".rc-listing-card__title-element") or
                     card.select_one("h3") or card.select_one("h2") or
@@ -644,6 +646,19 @@ def scrape_reverb(source: dict, keywords: list[str]) -> ScrapeResult:
             href = "https://reverb.com" + href
 
         listing_id = card.get("data-listing-id") or re.sub(r'[^a-z0-9]', '', title.lower())[:32]
+        # The title-slug ID keeps existing stored listings from looking new,
+        # but two different listings with the same title (common: several
+        # sellers all listing "Neumann KM 184 Microphone") would collapse
+        # into one. Only when a title repeats within this page, fall back to
+        # the item's own ID from its URL for the repeats.
+        if href and href in seen_hrefs:
+            continue
+        seen_hrefs.add(href)
+        if listing_id in seen_listing_ids:
+            item_match = re.search(r'/item/(\d+)', href)
+            if item_match:
+                listing_id = f"{listing_id}-{item_match.group(1)}"
+        seen_listing_ids.add(listing_id)
 
         listings.append(Listing(
             source_name=name,

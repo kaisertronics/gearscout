@@ -4,6 +4,7 @@ Prevents re-sending listings across multiple daily runs, and keeps enough
 detail (price, url, image, etc.) for the dashboard to display them.
 """
 import logging
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -133,14 +134,23 @@ def search_listings(query_text: str, limit: int = 300) -> list[dict]:
     from scrapers.base import keyword_match
 
     like = f"%{query_text}%"
+    # Model-number-style queries ("km184") should also find "KM 184" /
+    # "KM-184" — same rule as keyword_match's compact fallback — so widen the
+    # prefilter to compare with spaces/hyphens stripped from the stored text.
+    compact = re.sub(r'[^a-z0-9]', '', query_text.lower())
+    strip = lambda col: f"lower(replace(replace(coalesce({col},''),' ',''),'-',''))"
+    extra_sql, extra_params = "", ()
+    if len(compact) >= 4 and any(c.isdigit() for c in compact):
+        extra_sql = f" OR {strip('title')} LIKE ? OR {strip('description')} LIKE ?"
+        extra_params = (f"%{compact}%", f"%{compact}%")
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            """SELECT * FROM seen
+            f"""SELECT * FROM seen
                WHERE url IS NOT NULL AND url != ''
-                 AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)
+                 AND (title LIKE ? OR description LIKE ? OR tags LIKE ?{extra_sql})
                ORDER BY first_seen DESC""",
-            (like, like, like),
+            (like, like, like, *extra_params),
         ).fetchall()
 
     keywords = [query_text]
