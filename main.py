@@ -122,6 +122,7 @@ def run_scrape_cycle():
             run_number=run_number,
             max_listings_per_source=email_cfg.get("max_listings_per_source", 8),
             max_total_listings=email_cfg.get("max_total_listings", 40),
+            dashboard_url=email_cfg.get("dashboard_url", "http://localhost:8420"),
         )
         success = send_email(
             html=html,

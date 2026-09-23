@@ -50,6 +50,10 @@ email:
   # Requires 2FA to be enabled on your Google account first.
   password: ""
   subject: "Gear Scout Digest"
+  # Whatever URL actually reaches this dashboard from wherever you read your
+  # email — localhost only works if you open the email on this same machine.
+  # Used by the "See everything on the dashboard" button in the email.
+  dashboard_url: "http://localhost:8420"
 
 # --- Schedule ------------------------------------------------
 schedule:

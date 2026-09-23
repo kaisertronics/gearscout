@@ -417,6 +417,7 @@ def settings_email():
         email_cfg["max_total_listings"] = max(1, int(request.form.get("max_total_listings", "").strip()))
     except ValueError:
         pass
+    email_cfg["dashboard_url"] = request.form.get("dashboard_url", "").strip() or "http://localhost:8420"
 
     schedule_cfg = cfg.setdefault("schedule", {})
     schedule_cfg["timezone"] = request.form.get("timezone", "").strip()

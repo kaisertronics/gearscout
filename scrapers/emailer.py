@@ -30,6 +30,7 @@ def build_email_html(
     run_number: int,
     max_listings_per_source: int = 8,
     max_total_listings: int = 40,
+    dashboard_url: str = "http://localhost:8420",
 ) -> str:
     """
     Build a full HTML email.
@@ -246,6 +247,24 @@ def build_email_html(
 
     <!-- Body -->
     <div style="background:#f1f5f9;padding:24px 28px;border-radius:0 0 12px 12px;">
+
+      <!-- This email is always a capped subset (see MAX_LISTINGS_PER_SOURCE/
+      MAX_TOTAL_LISTINGS_SHOWN above) — this banner is unconditional, not
+      just shown when this particular run happened to get truncated, so
+      it's never a surprise that the dashboard has more. -->
+      <div style="margin-bottom:20px;padding:14px 18px;background:#1e3a5f;
+          border-radius:8px;display:flex;align-items:center;justify-content:space-between;
+          flex-wrap:wrap;gap:10px;">
+        <span style="color:#ffffff;font-size:13px;">
+          This email never lists <strong>all</strong> your results — only a capped preview.
+        </span>
+        <a href="{dashboard_url}" target="_blank" rel="noopener"
+           style="display:inline-block;padding:8px 18px;background:#ffffff;
+               color:#1e3a5f;text-decoration:none;border-radius:6px;
+               font-size:13px;font-weight:700;white-space:nowrap;">
+          See everything on the dashboard &rarr;
+        </a>
+      </div>
 
       {failed_alert}
 

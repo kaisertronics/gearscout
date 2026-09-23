@@ -63,6 +63,18 @@
           keep an eye out if it starts looking cut off in your inbox.
         </p>
 
+        <div class="form-row">
+          <label class="grow">Dashboard URL (used by the "See everything" button in the email)
+            <input type="url" name="dashboard_url" value="{{ email_cfg.get('dashboard_url', 'http://localhost:8420') }}" placeholder="http://localhost:8420">
+          </label>
+        </div>
+        <p class="muted">
+          Whatever you'd actually type into a browser to reach this dashboard from wherever you
+          read your email — <code>http://localhost:8420</code> only works if you're opening the
+          email on this same machine. Use your LAN IP (e.g. <code>http://192.168.1.20:8420</code>)
+          or your ngrok URL if you read email on your phone.
+        </p>
+
         <h3>Schedule</h3>
         <div class="form-row">
           <label>Timezone
