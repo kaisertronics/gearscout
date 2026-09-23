@@ -87,6 +87,7 @@ def build_email_html(
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">
             <span style="color:{color};font-weight:bold;">{icon}</span>
             &nbsp;<a href="{r.source_url}" style="color:#1e40af;text-decoration:none;">{r.source_name}</a>
+            <span style="color:#94a3b8;font-size:11px;"> (source's own page, not just your matches)</span>
           </td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">{count}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:12px;">{duration}</td>
