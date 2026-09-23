@@ -65,6 +65,9 @@ schedule:
   # once a day at 8am in the timezone above — change it to whatever cadence
   # you want (e.g. "0 7,12,17,21 * * *" for 4x/day).
   cron: "0 8 * * *"
+  # Set true to also scrape + email immediately every time the scout container
+  # starts (including rebuilds/reboots). Off by default.
+  run_on_startup: false
 
 # --- Keywords ------------------------------------------------
 # This is the whole point of the app: it only ever surfaces a listing if its

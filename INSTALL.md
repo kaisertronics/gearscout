@@ -111,7 +111,9 @@ without affecting the other two — or start only what you need:
 docker compose up -d scout dashboard
 ```
 
-Gear Scout runs an initial scrape immediately, then on your cron schedule.
+Gear Scout scrapes on your cron schedule. To get a digest right at startup too,
+set `run_on_startup: true` under `schedule:` in `config.yaml` — otherwise use the
+Dashboard's "Scrape now" button for a first run (it never sends an email).
 Watch it work:
 
 ```bash

@@ -175,9 +175,12 @@ def run_schedule():
 
     logger.info("Scheduler started. Cron: '%s' (%s)", cron_expr, tz_name)
 
-    # Also run immediately on startup so you get a first digest right away
-    logger.info("Running initial scrape now...")
-    run_scrape_cycle()
+    # Off by default: every container restart (rebuild, reboot, crash
+    # recovery) would otherwise scrape and email immediately, on top of the
+    # normal cron times. Opt in with `schedule: run_on_startup: true`.
+    if schedule_cfg.get("run_on_startup", False):
+        logger.info("Running initial scrape now (run_on_startup)...")
+        run_scrape_cycle()
 
     try:
         scheduler.start()
