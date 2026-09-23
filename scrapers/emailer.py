@@ -37,14 +37,23 @@ def build_email_html(
     - Bottom section: source status report (always included)
     """
 
-    # --- Source status rows ---
-    status_rows = ""
+    # --- Source status tiles ---
     # Blocked sources (Guitar Center/Sweetwater/eBay behind Akamai) aren't
     # bugs needing attention — they're expected and have a working manual
     # link — so they're excluded from the "failed" alert/tally below.
     failed_sources = [r for r in results if not r.success and not r.blocked]
     ok_sources = [r for r in results if r.success or r.blocked]
 
+    # Tiled instead of a row-per-source table — 3 per row, wrapped in a
+    # plain <table> (not CSS flex/grid) since that's what renders reliably
+    # across email clients. Only blocked/failed tiles link the source name
+    # to its raw page — that link is the deliberate "check this yourself"
+    # fallback for sources the app can't scrape or search. A successful
+    # source's name used to link there too, but that's the same unfiltered
+    # browse URL, and sitting next to "X new" it read like a shortcut to
+    # those matches, which it never was — the real matches are the listing
+    # cards above. Dropping the link there removes the false affordance.
+    status_tiles = []
     for r in results:
         color = _source_status_color(r)
         icon = "✓" if r.success else ("🔗" if r.blocked else "✗")
@@ -55,17 +64,23 @@ def build_email_html(
         else:
             count = "FAILED"
         duration = f"{r.duration_seconds:.1f}s"
-        fix = ""
+
+        if r.success:
+            name_html = f'<span style="color:#1e293b;">{r.source_name}</span>'
+        else:
+            name_html = f'<a href="{r.source_url}" style="color:#1e40af;text-decoration:none;">{r.source_name}</a>'
+
+        fix_html = ""
         if not r.success and r.fix_hint:
             manual_link = ""
             if r.source_url:
                 manual_link = f"""
                 <div style="margin-top:8px;">
                   <a href="{r.source_url}" target="_blank" rel="noopener"
-                     style="display:inline-block;padding:6px 14px;background:#1e3a5f;
+                     style="display:inline-block;padding:5px 12px;background:#1e3a5f;
                          color:#ffffff;text-decoration:none;border-radius:6px;
-                         font-size:12px;font-weight:600;">
-                    Open {r.source_name} in browser &rarr;
+                         font-size:11px;font-weight:600;">
+                    Open in browser &rarr;
                   </a>
                 </div>"""
             box_bg, box_border, box_text = (
@@ -73,28 +88,39 @@ def build_email_html(
                 else ("#fffbeb", "#fde68a", "#b45309")
             )
             label = "Heads up:" if r.blocked else "How to fix:"
-            fix = f"""
-            <tr>
-              <td colspan="4" style="padding:4px 12px 10px 28px;font-size:12px;
-                  color:{box_text};background:{box_bg};border-bottom:1px solid {box_border};">
-                <strong>{label}</strong> {r.fix_hint}
-                {manual_link}
-              </td>
-            </tr>"""
-        error_text = "" if (r.success or r.blocked) else (r.error or "")
-        status_rows += f"""
-        <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">
-            <span style="color:{color};font-weight:bold;">{icon}</span>
-            &nbsp;<a href="{r.source_url}" style="color:#1e40af;text-decoration:none;">{r.source_name}</a>
-            <span style="color:#94a3b8;font-size:11px;"> (source's own page, not just your matches)</span>
-          </td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">{count}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:12px;">{duration}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#ef4444;font-size:12px;">
-            {error_text}
-          </td>
-        </tr>{fix}"""
+            fix_html = f"""
+            <div style="margin-top:8px;padding:8px 10px;font-size:11px;
+                color:{box_text};background:{box_bg};border:1px solid {box_border};
+                border-radius:6px;">
+              <strong>{label}</strong> {r.fix_hint}
+              {manual_link}
+            </div>"""
+        error_html = ""
+        if not r.success and not r.blocked and r.error:
+            error_html = f'<div style="margin-top:6px;font-size:11px;color:#ef4444;">{r.error}</div>'
+
+        status_tiles.append(f"""
+        <td width="33%" valign="top" style="padding:6px;">
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;
+              padding:12px 14px;height:100%;">
+            <div style="font-size:13px;font-weight:600;">
+              <span style="color:{color};">{icon}</span> {name_html}
+            </div>
+            <div style="margin-top:4px;font-size:12px;color:#64748b;">
+              {count} &middot; {duration}
+            </div>
+            {error_html}
+            {fix_html}
+          </div>
+        </td>""")
+
+    # Group tiles 3-per-row, padding the last row so cells stay evenly sized.
+    status_rows = ""
+    for i in range(0, len(status_tiles), 3):
+        row_tiles = status_tiles[i:i + 3]
+        while len(row_tiles) < 3:
+            row_tiles.append('<td width="33%" style="padding:6px;"></td>')
+        status_rows += f"<tr>{''.join(row_tiles)}</tr>"
 
     # --- Listing cards ---
     # Capped both per-source AND overall — with enough sources actually
@@ -236,16 +262,7 @@ def build_email_html(
         <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;color:#1e293b;">
           📡 Source Status &mdash; {total_ok}/{total_sources} OK
         </h2>
-        <table style="width:100%;border-collapse:collapse;background:#ffffff;
-            border-radius:8px;overflow:hidden;font-size:13px;">
-          <thead>
-            <tr style="background:#e2e8f0;">
-              <th style="text-align:left;padding:8px 12px;color:#475569;">Source</th>
-              <th style="text-align:left;padding:8px 12px;color:#475569;">Result</th>
-              <th style="text-align:left;padding:8px 12px;color:#475569;">Time</th>
-              <th style="text-align:left;padding:8px 12px;color:#475569;">Error</th>
-            </tr>
-          </thead>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
           <tbody>{status_rows}</tbody>
         </table>
       </div>
