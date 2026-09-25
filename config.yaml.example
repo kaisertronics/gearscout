@@ -122,12 +122,12 @@ sources:
 
   # ---- General marketplaces (cover every instrument category) ----
   - name: "Reverb — All Used"
-    url: "https://reverb.com/marketplace?condition=used&sort=published_at%7Cdesc"
+    url: "https://reverb.com/marketplace?condition=used&condition=b-stock&sort=published_at%7Cdesc"
     type: html
     enabled: true
 
   - name: "eBay — Musical Instruments & Gear"
-    url: "https://www.ebay.com/b/Musical-Instruments-Gear/619/bn_1865601?LH_ItemCondition=3000&_sop=10"
+    url: "https://www.ebay.com/b/Musical-Instruments-Gear/619/bn_1865601?LH_ItemCondition=1500%7C2500%7C3000&_sop=10"
     type: html
     enabled: true
 

@@ -624,6 +624,26 @@ def scrape_reverb(source: dict, keywords: list[str]) -> ScrapeResult:
             duration_seconds=time.time() - start,
         )
 
+    # A live search only sees page 1 otherwise — confirmed live: "wa47"
+    # (used + B-stock) had 58 matches on page 1 and 13 more on page 2.
+    # Scheduled runs browse newest-first and only need page 1.
+    is_live_search = len(keywords) == 1 and keywords[0].strip()
+    if is_live_search:
+        page_hrefs = lambda cs: {
+            a["href"] for c in cs for a in c.select("a[href*='/item/']")[:1]
+        }
+        known = page_hrefs(cards)
+        for page in range(2, 6):
+            page_html, _ = _get_html(f"{url}&page={page}", use_playwright=True)
+            if not page_html:
+                break
+            page_cards = BeautifulSoup(page_html, "html.parser").select(".rc-listing-card")
+            new_hrefs = page_hrefs(page_cards) - known
+            if not new_hrefs:
+                break
+            known |= new_hrefs
+            cards = list(cards) + page_cards
+
     seen_listing_ids: set[str] = set()
     seen_hrefs: set[str] = set()
     for card in cards:
@@ -700,7 +720,7 @@ def scrape_ebay(source: dict, keywords: list[str]) -> ScrapeResult:
     if len(keywords) == 1 and keywords[0].strip():
         url = (
             f"https://www.ebay.com/sch/i.html?_nkw={quote_plus(keywords[0].strip())}"
-            f"&_sacat=180014&LH_ItemCondition=3000&_sop=10"
+            f"&_sacat=180014&LH_ItemCondition=1500%7C2500%7C3000&_sop=10"
         )
 
     html, error = _get_html(url, use_playwright=True)
