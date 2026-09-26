@@ -73,6 +73,10 @@
       Chrome: click the blocked-pop-up icon at the right of the address bar &rarr;
       <strong>Always allow</strong>. The permission is per address, so allow it again for any
       other address you open this dashboard from.
+      <div style="margin-top:10px;">
+        <button type="button" id="fbm-popup-help-btn" class="btn btn-sm">Enable pop-ups for this site</button>
+        <div id="fbm-popup-help" class="fbm-popup-help" style="display:none;margin-top:8px;"></div>
+      </div>
     </div>
 
     <form id="fbm-form" class="search-form" onsubmit="return false;">
@@ -202,6 +206,67 @@
     }
 
     document.querySelectorAll('.fbm-host').forEach(el => { el.textContent = location.host; });
+
+    // Web pages can't navigate to chrome://, edge:// or about: pages, and
+    // Safari/iOS have no settings URL at all — so for Chromium browsers,
+    // copy this site's own permissions page to paste into the address bar
+    // (works even when Chrome shows no blocked-pop-up icon), and show plain
+    // steps everywhere else.
+    const fbmPopupHelpBtn = document.getElementById('fbm-popup-help-btn');
+    const fbmPopupHelp = document.getElementById('fbm-popup-help');
+
+    function fbmPopupSteps() {
+      const ua = navigator.userAgent;
+      const site = encodeURIComponent(location.origin);
+      const isIOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      if (isIOS && /CriOS/.test(ua)) {
+        return { steps: 'In the Chrome app: ⋯ menu → Settings → Content Settings → Block Pop-ups → turn it off.' };
+      }
+      if (isIOS) {
+        return { steps: 'Open the iPhone/iPad Settings app → Safari → turn off "Block Pop-ups".' };
+      }
+      if (/Edg\//.test(ua)) {
+        return { url: `edge://settings/content/siteDetails?site=${site}`, name: 'Edge' };
+      }
+      if (/Chrome\//.test(ua) && !/OPR\//.test(ua)) {
+        return { url: `chrome://settings/content/siteDetails?site=${site}`, name: 'Chrome' };
+      }
+      if (/Firefox\//.test(ua)) {
+        return { steps: `Firefox: open Settings → Privacy & Security → Permissions → "Block pop-up windows" → Exceptions… → add ${location.origin} → Allow.` };
+      }
+      return { steps: `Safari: Safari menu → Settings → Websites → Pop-up Windows → set ${location.host} to "Allow" (the dashboard must be open in a tab for it to be listed). Then refresh this page.` };
+    }
+
+    fbmPopupHelpBtn.addEventListener('click', async () => {
+      const info = fbmPopupSteps();
+      fbmPopupHelp.replaceChildren();
+      fbmPopupHelp.style.display = '';
+      if (!info.url) {
+        fbmPopupHelp.textContent = info.steps;
+        return;
+      }
+      const intro = document.createElement('div');
+      const field = document.createElement('input');
+      field.type = 'text';
+      field.readOnly = true;
+      field.value = info.url;
+      field.className = 'search-input';
+      field.style.marginTop = '6px';
+      field.addEventListener('focus', () => field.select());
+      const after = document.createElement('div');
+      after.style.marginTop = '6px';
+      after.textContent = `On that page, set "Pop-ups and redirects" to Allow, then come back and refresh this page.`;
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(info.url);
+        copied = true;
+      } catch (e) { /* clipboard unavailable — the field below can be copied by hand */ }
+      intro.textContent = copied
+        ? `Copied! Open a new tab, paste into the address bar and press Enter (${info.name} doesn't let websites open its settings directly):`
+        : `Copy this, open a new tab, paste it into the address bar and press Enter (${info.name} doesn't let websites open its settings directly):`;
+      fbmPopupHelp.append(intro, field, after);
+      if (!copied) field.focus();
+    });
 
     // Same approach as SearchTempest's "Open All (8 Tabs)" (confirmed by
     // intercepting its window.open calls): one window.open per region, all
