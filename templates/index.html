@@ -65,10 +65,14 @@
     </div>
 
     <div class="fbm-note">
-      Most browsers (Safari especially) only open one new tab per click. The first click opens
-      as many regions as your browser allows; if any were blocked, the button turns into
-      <strong>Open next region</strong> — keep clicking it and each click opens one more until
-      all {{ fbm_regions|length }} are open. A link for every region also appears underneath.
+      <strong>One-time setup for opening all {{ fbm_regions|length }} at once:</strong> allow pop-ups for
+      <code class="fbm-host"></code> in your browser (the same permission SearchTempest's
+      "Open All" button needs). Without it, browsers only open one tab per click.
+      <br>Safari: Safari &rarr; Settings &rarr; Websites &rarr; Pop-up Windows &rarr; set
+      <code class="fbm-host"></code> to <strong>Allow</strong>.
+      Chrome: click the blocked-pop-up icon at the right of the address bar &rarr;
+      <strong>Always allow</strong>. The permission is per address, so allow it again for any
+      other address you open this dashboard from.
     </div>
 
     <form id="fbm-form" class="search-form" onsubmit="return false;">
@@ -197,43 +201,17 @@
       return `https://www.facebook.com/marketplace/${locationId}/search?query=${encodeURIComponent(query)}&sortBy=best_match`;
     }
 
-    // Browsers only reliably allow one window.open() per click — Safari
-    // enforces that even with pop-ups set to Allow, and (confirmed by the
-    // user) still returns a window handle for the ones it silently drops,
-    // so blocked opens can't be detected. The first click tries every
-    // region; the rest are then always queued regardless, and each later
-    // click opens the next one, which is always allowed since it's its own
-    // click. In a browser that did open all eight, the button can be ignored.
-    const fbmDefaultLabel = fbmOpenBtn.textContent;
-    let fbmQueue = [];
-    let fbmQueueQuery = null;
+    document.querySelectorAll('.fbm-host').forEach(el => { el.textContent = location.host; });
 
-    function fbmResetButton() {
-      fbmQueue = [];
-      fbmQueueQuery = null;
-      fbmOpenBtn.textContent = fbmDefaultLabel;
-    }
-
-    function fbmUpdateButton() {
-      if (!fbmQueue.length) {
-        fbmResetButton();
-        return;
-      }
-      const done = FBM_REGIONS.length - fbmQueue.length + 1;
-      fbmOpenBtn.textContent = `Only 1 tab opened? Click for next region — ${fbmQueue[0].name} (${done} of ${FBM_REGIONS.length})`;
-    }
-
+    // Same approach as SearchTempest's "Open All (8 Tabs)" (confirmed by
+    // intercepting its window.open calls): one window.open per region, all
+    // in the same click. Whether more than the first actually opens is
+    // decided by the browser's per-site pop-up permission — no page code can
+    // override that — hence the setup note above naming this exact host.
     fbmOpenBtn.addEventListener('click', () => {
       const query = fbmQueryInput.value.trim();
       if (!query) {
         fbmQueryInput.focus();
-        return;
-      }
-
-      if (fbmQueue.length && fbmQueueQuery === query) {
-        const region = fbmQueue.shift();
-        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
-        fbmUpdateButton();
         return;
       }
 
@@ -243,14 +221,9 @@
       fbmManualLinks.style.display = '';
 
       for (const region of FBM_REGIONS) {
-        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
+        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank', 'noreferrer');
       }
-      fbmQueue = FBM_REGIONS.slice(1);
-      fbmQueueQuery = query;
-      fbmUpdateButton();
     });
-
-    fbmQueryInput.addEventListener('input', fbmResetButton);
 
     fbmQueryInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') fbmOpenBtn.click();
