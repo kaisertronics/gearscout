@@ -316,7 +316,7 @@ def scrape_facebook_group(source: dict, keywords: list[str]) -> ScrapeResult:
                         continue
 
                     # Extract price if mentioned
-                    price_match = re.search(r'\$[\d,]+(?:\.\d{2})?', text_content)
+                    price_match = re.search(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', text_content)
                     price = price_match.group(0) if price_match else None
 
                     # First line is usually the title / item name
@@ -493,7 +493,7 @@ def scrape_facebook_marketplace_region(source: dict, keywords: list[str]) -> Scr
                         # "$1,200"), which a naive comma-split breaks into
                         # "$1" and "200", silently truncating any price at
                         # or above $1,000 down to its leading digit.
-                        price_match = re.search(r'\$[\d,]+(?:\.\d{2})?|(?<![A-Za-z])[Ff]ree(?![A-Za-z])', label)
+                        price_match = re.search(r'\$\d+(?:,\d{3})*(?:\.\d{2})?|(?<![A-Za-z])[Ff]ree(?![A-Za-z])', label)
                         if price_match:
                             title = label[:price_match.start()].strip().rstrip(',').strip()
                             matched = price_match.group(0)
@@ -508,7 +508,7 @@ def scrape_facebook_marketplace_region(source: dict, keywords: list[str]) -> Scr
                         # aria-label missing or didn't parse as expected —
                         # fall back to the line-based heuristic.
                         if price is None:
-                            price_match = re.search(r'\$[\d,]+(?:\.\d{2})?', text_content)
+                            price_match = re.search(r'\$\d+(?:,\d{3})*(?:\.\d{2})?', text_content)
                             price = price_match.group(0) if price_match else None
                         lines = [l.strip() for l in text_content.split('\n') if l.strip()]
                         price_idx = next((i for i, l in enumerate(lines) if re.match(r'^\$[\d,]', l)), None)
