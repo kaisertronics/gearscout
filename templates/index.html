@@ -65,11 +65,10 @@
     </div>
 
     <div class="fbm-note">
-      Browsers generally only allow one tab to open automatically per click, and won't always
-      show a visible warning when they block the rest — so clicking the button below opens
-      what it can, and a link for <strong>every</strong> region always appears underneath it too.
-      Click any of those directly to open that region — a normal link click always works,
-      regardless of your browser's pop-up settings.
+      Most browsers (Safari especially) only open one new tab per click. The first click opens
+      as many regions as your browser allows; if any were blocked, the button turns into
+      <strong>Open next region</strong> — keep clicking it and each click opens one more until
+      all {{ fbm_regions|length }} are open. A link for every region also appears underneath.
     </div>
 
     <form id="fbm-form" class="search-form" onsubmit="return false;">
@@ -198,19 +197,43 @@
       return `https://www.facebook.com/marketplace/${locationId}/search?query=${encodeURIComponent(query)}&sortBy=best_match`;
     }
 
-    // Whether a window.open() call actually opened a tab is not reliably
-    // detectable from JS — browsers vary in whether a blocked call returns
-    // null, a handle that reports closed=true, or (in some cases observed
-    // in the wild) something that looks "open" even though nothing
-    // rendered, with no visible warning of any kind. Rather than guess,
-    // this always renders a real link per region below the button — a
-    // genuine click on an <a> is never subject to the one-pop-up-per-click
-    // limit the loop below runs into, so it's a guaranteed way to reach
-    // every region regardless of what the browser did with the bulk attempt.
+    // Browsers only reliably allow one window.open() per click — Safari
+    // enforces that even with pop-ups set to Allow. The first click tries
+    // every region; any whose open() came back null (blocked) are queued,
+    // and each later click opens the next queued one, which is always
+    // allowed since it's its own click. Detection of blocked opens isn't
+    // perfect across browsers, so the per-region links below stay as a
+    // guaranteed fallback.
+    const fbmDefaultLabel = fbmOpenBtn.textContent;
+    let fbmQueue = [];
+    let fbmQueueQuery = null;
+
+    function fbmResetButton() {
+      fbmQueue = [];
+      fbmQueueQuery = null;
+      fbmOpenBtn.textContent = fbmDefaultLabel;
+    }
+
+    function fbmUpdateButton() {
+      if (!fbmQueue.length) {
+        fbmResetButton();
+        return;
+      }
+      const done = FBM_REGIONS.length - fbmQueue.length + 1;
+      fbmOpenBtn.textContent = `Open next region — ${fbmQueue[0].name} (${done} of ${FBM_REGIONS.length})`;
+    }
+
     fbmOpenBtn.addEventListener('click', () => {
       const query = fbmQueryInput.value.trim();
       if (!query) {
         fbmQueryInput.focus();
+        return;
+      }
+
+      if (fbmQueue.length && fbmQueueQuery === query) {
+        const region = fbmQueue.shift();
+        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
+        fbmUpdateButton();
         return;
       }
 
@@ -219,10 +242,14 @@
       ).join('');
       fbmManualLinks.style.display = '';
 
-      for (const region of FBM_REGIONS) {
-        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
-      }
+      fbmQueue = FBM_REGIONS.filter(region =>
+        !window.open(fbmRegionSearchUrl(region.location_id, query), '_blank')
+      );
+      fbmQueueQuery = query;
+      fbmUpdateButton();
     });
+
+    fbmQueryInput.addEventListener('input', fbmResetButton);
 
     fbmQueryInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') fbmOpenBtn.click();
