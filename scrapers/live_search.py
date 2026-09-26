@@ -27,10 +27,11 @@ def run_live_search(
     on_progress: Optional[Callable[[int, int, str], None]] = None,
 ) -> list[ScrapeResult]:
     """Scrapes every enabled source live, filtering by `query` as if it were
-    the only keyword. Matches are recorded via mark_seen (idempotent) so
-    they show up in the regular dashboard/search views and don't get
-    re-notified by a future scheduled run's email — but ALL current matches
-    are returned here, not just ones that are new."""
+    the only keyword. Matches are recorded via mark_seen(live_only=True) so
+    they show up on the Search page (not the Dashboard, since a one-off
+    phrase can match anything) and don't get re-notified by a future
+    scheduled run's email — but ALL current matches are returned here, not
+    just ones that are new."""
     sources = [s for s in cfg.get("sources", []) if s.get("enabled", True)]
 
     # A live, on-demand search should mean "search everything right now" —
@@ -68,7 +69,7 @@ def run_live_search(
             )
         results.append(result)
         for listing in result.listings:
-            mark_seen(listing)
+            mark_seen(listing, live_only=True)
 
     if on_progress:
         on_progress(len(sources), len(sources), None)

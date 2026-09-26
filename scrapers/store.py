@@ -36,6 +36,12 @@ def _conn() -> sqlite3.Connection:
         conn.execute("ALTER TABLE seen ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
     if "tags" not in existing_cols:
         conn.execute("ALTER TABLE seen ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+    # 1 = only ever found by a one-off live search (any phrase the user typed,
+    # e.g. "octavia" pulls in furniture and books from FB Marketplace), not by
+    # a scrape against the standing keyword list. Kept for the Search page but
+    # hidden from the Dashboard's recent listings.
+    if "live_only" not in existing_cols:
+        conn.execute("ALTER TABLE seen ADD COLUMN live_only INTEGER NOT NULL DEFAULT 0")
     conn.commit()
     return conn
 
@@ -48,13 +54,13 @@ def is_seen(global_id: str) -> bool:
         return row is not None
 
 
-def mark_seen(listing):
+def mark_seen(listing, live_only: bool = False):
     with _conn() as conn:
         conn.execute(
             """INSERT OR IGNORE INTO seen
                (global_id, source_name, title, url, price, image_url,
-                description, posted_at, first_seen)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+                description, posted_at, first_seen, live_only)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 listing.global_id,
                 listing.source_name,
@@ -65,8 +71,16 @@ def mark_seen(listing):
                 listing.description,
                 listing.posted_at.isoformat() if listing.posted_at else None,
                 datetime.now(timezone.utc).isoformat(),
+                1 if live_only else 0,
             ),
         )
+        if not live_only:
+            # A standing-keyword scrape found something a live search already
+            # stored — it's a real match, so show it on the Dashboard now.
+            conn.execute(
+                "UPDATE seen SET live_only = 0 WHERE global_id = ? AND live_only = 1",
+                (listing.global_id,),
+            )
         conn.commit()
 
 
@@ -76,7 +90,7 @@ def filter_new(listings) -> list:
     for listing in listings:
         if not is_seen(listing.global_id):
             new.append(listing)
-            mark_seen(listing)
+        mark_seen(listing)
     return new
 
 
@@ -105,7 +119,7 @@ def recent_listings(limit: int = 100, source_name: str = None) -> list[dict]:
     Excludes rows with no URL — those all predate the columns added for
     listing details (url/price/image/etc.), from back when this table only
     tracked dedup fingerprints, and have nothing real to link to or show."""
-    query = "SELECT * FROM seen WHERE url IS NOT NULL AND url != ''"
+    query = "SELECT * FROM seen WHERE url IS NOT NULL AND url != '' AND live_only = 0"
     params: tuple = ()
     if source_name:
         query += " AND source_name = ?"
