@@ -149,7 +149,6 @@ body {
   color: var(--amber-text);
   border-radius: 6px;
   font-size: 12px;
-  white-space: pre-wrap;
 }
 .blocked-cell { color: var(--muted); }
 .blocked-hint {
@@ -160,7 +159,6 @@ body {
   color: var(--blue-text);
   border-radius: 6px;
   font-size: 12px;
-  white-space: pre-wrap;
 }
 
 .badge {
@@ -601,4 +599,72 @@ code {
   height: 600px;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+/* ---------- Phones ----------
+   Everything above is laid out for desktop widths; this reflows it for
+   narrow screens instead of letting the nav, tables and forms run off the
+   right edge. */
+@media (max-width: 640px) {
+  .topbar-inner {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 12px;
+  }
+  .brand { white-space: nowrap; font-size: 18px; }
+  .topbar nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+  }
+  .topbar nav a { margin-left: 0; font-size: 14px; }
+  .logout-form { margin-left: 0; }
+  .topbar-search {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .container { padding: 16px 12px 48px; }
+  .panel { padding: 14px; border-radius: 10px; }
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-value { font-size: 16px; overflow-wrap: anywhere; }
+
+  .listing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+  /* Tables become one card per row. Hidden helper rows (the Sources page's
+     inline edit/test rows) keep their inline display:none until opened. */
+  .status-table,
+  .status-table tbody,
+  .status-table tr,
+  .status-table td { display: block; width: 100%; }
+  .status-table thead { display: none; }
+  .status-table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+  .status-table td { border-bottom: none; padding: 3px 0; }
+  .status-table td:empty { display: none; }
+  .url-cell a { max-width: 100%; }
+
+  .scrape-now-row,
+  .live-search-row { flex-wrap: wrap; }
+  .search-form { flex-wrap: wrap; }
+  .search-form .search-input { flex-basis: 100%; }
+  .search-form button { flex: 1; }
+
+  .form-row { gap: 10px; }
+  .form-row label,
+  .form-row label.grow { flex: 1 1 100%; min-width: 0; }
+  .form-row input,
+  .form-row select { min-width: 0; width: 100%; box-sizing: border-box; }
+
+  .vnc-frame { height: 70vh; }
+
+  /* iOS Safari zooms the page when focusing any input under 16px. */
+  input, select, textarea { font-size: 16px !important; }
 }
