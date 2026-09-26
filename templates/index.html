@@ -198,12 +198,12 @@
     }
 
     // Browsers only reliably allow one window.open() per click — Safari
-    // enforces that even with pop-ups set to Allow. The first click tries
-    // every region; any whose open() came back null (blocked) are queued,
-    // and each later click opens the next queued one, which is always
-    // allowed since it's its own click. Detection of blocked opens isn't
-    // perfect across browsers, so the per-region links below stay as a
-    // guaranteed fallback.
+    // enforces that even with pop-ups set to Allow, and (confirmed by the
+    // user) still returns a window handle for the ones it silently drops,
+    // so blocked opens can't be detected. The first click tries every
+    // region; the rest are then always queued regardless, and each later
+    // click opens the next one, which is always allowed since it's its own
+    // click. In a browser that did open all eight, the button can be ignored.
     const fbmDefaultLabel = fbmOpenBtn.textContent;
     let fbmQueue = [];
     let fbmQueueQuery = null;
@@ -220,7 +220,7 @@
         return;
       }
       const done = FBM_REGIONS.length - fbmQueue.length + 1;
-      fbmOpenBtn.textContent = `Open next region — ${fbmQueue[0].name} (${done} of ${FBM_REGIONS.length})`;
+      fbmOpenBtn.textContent = `Only 1 tab opened? Click for next region — ${fbmQueue[0].name} (${done} of ${FBM_REGIONS.length})`;
     }
 
     fbmOpenBtn.addEventListener('click', () => {
@@ -242,9 +242,10 @@
       ).join('');
       fbmManualLinks.style.display = '';
 
-      fbmQueue = FBM_REGIONS.filter(region =>
-        !window.open(fbmRegionSearchUrl(region.location_id, query), '_blank')
-      );
+      for (const region of FBM_REGIONS) {
+        window.open(fbmRegionSearchUrl(region.location_id, query), '_blank');
+      }
+      fbmQueue = FBM_REGIONS.slice(1);
       fbmQueueQuery = query;
       fbmUpdateButton();
     });
